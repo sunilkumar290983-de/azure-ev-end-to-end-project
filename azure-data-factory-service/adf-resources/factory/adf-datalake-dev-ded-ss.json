@@ -1,0 +1,15 @@
+{
+	"name": "adf-datalake-dev-ded-ss",
+	"properties": {
+		"trustModeClaimForMi": {
+			"value": "Disabled",
+			"editable": true
+		}
+	},
+	"location": "indiasouthcentral",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "ddfa7448-6bce-43f2-8b1f-013befab95d2",
+		"tenantId": "f3abb179-df81-4e15-bf1c-abe594a3d7cc"
+	}
+}

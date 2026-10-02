@@ -1,0 +1,153 @@
+{
+	"name": "pl_ingest_voltgrid_payments_to_bronze",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetAuthToken",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"url": "https://ev-project-navy-mu.vercel.app/api/auth/login/",
+					"body": {
+						"value": "@{concat('{\"username\":\"', pipeline().parameters.api_username,'\",\"password\":\"', pipeline().parameters.api_password, '\"}')}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "CopyPaymentsToBronze",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "GetAuthToken",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "HttpReadSettings",
+							"requestMethod": "GET",
+							"additionalHeaders": {
+								"value": "Authorization: @{concat('Token ', activity('GetAuthToken').output.token)}",
+								"type": "Expression"
+							},
+							"requestTimeout": ""
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"sink": {
+						"type": "JsonSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "JsonWriteSettings"
+						}
+					},
+					"enableStaging": false,
+					"enableSkipIncompatibleRow": true,
+					"logSettings": {
+						"enableCopyActivityLog": true,
+						"copyActivityLogSettings": {
+							"logLevel": "Warning",
+							"enableReliableLogging": false
+						},
+						"logLocationSettings": {
+							"linkedServiceName": {
+								"referenceName": "ev_adls_gen2",
+								"type": "LinkedServiceReference"
+							},
+							"path": "logs/copy-errors/"
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_voltgrid_payments",
+						"type": "DatasetReference",
+						"parameters": {
+							"auth_token": "@activity('GetAuthToken').output.token"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_adls_bronze_json",
+						"type": "DatasetReference",
+						"parameters": {
+							"run_date": "@pipeline().parameters.run_date"
+						}
+					}
+				]
+			},
+			{
+				"name": "AlertOnFailure",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "CopyPaymentsToBronze",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"url": "https://httpbin.org/post",
+					"body": {
+						"value": "@{concat('{\"text\":\"ADF Pipeline FAILED: ', pipeline().Pipeline, ' at ', utcnow(), '\"}')}",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"run_date": {
+				"type": "string"
+			},
+			"api_username": {
+				"type": "string"
+			},
+			"api_password": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-10-02T21:00:05Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
